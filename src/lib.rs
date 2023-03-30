@@ -1,8 +1,18 @@
 pub mod into_iter;
+pub mod iter;
+pub mod iter_mut;
+pub mod keys;
+pub mod values;
+pub mod values_mut;
 
 use std::mem::MaybeUninit;
 
 use into_iter::IntoIter;
+use iter::Iter;
+use iter_mut::IterMut;
+use keys::Keys;
+use values::Values;
+use values_mut::ValuesMut;
 
 const SUROTTO_FREE: u32 = 0b0;
 const SUROTTO_OCCUPIED: u32 = 0b1 << 31;
@@ -160,12 +170,44 @@ impl<T> SurottoMap<T> {
             None
         }
     }
+
+    #[inline]
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter {
+            inner: self.inner.iter().enumerate(),
+        }
+    }
+    #[inline]
+    pub fn iter_mut(&mut self) -> IterMut<'_, T> {
+        IterMut {
+            inner: self.inner.iter_mut().enumerate(),
+        }
+    }
+    #[inline]
+    pub fn keys(&self) -> Keys<'_, T> {
+        Keys {
+            inner: self.inner.iter().enumerate(),
+        }
+    }
+    #[inline]
+    pub fn values(&self) -> Values<'_, T> {
+        Values {
+            inner: self.inner.iter(),
+        }
+    }
+    #[inline]
+    pub fn values_mut(&mut self) -> ValuesMut<'_, T> {
+        ValuesMut {
+            inner: self.inner.iter_mut(),
+        }
+    }
 }
 
 impl<T> IntoIterator for SurottoMap<T> {
     type Item = (Key, T);
     type IntoIter = IntoIter<T>;
 
+    #[inline]
     fn into_iter(self) -> Self::IntoIter {
         IntoIter {
             inner: self.inner.into_iter().enumerate(),
