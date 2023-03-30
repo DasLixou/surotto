@@ -3,6 +3,12 @@ use std::mem::MaybeUninit;
 const SUROTTO_FREE: u32 = 0b0;
 const SUROTTO_OCCUPIED: u32 = 0b1 << 31;
 
+#[derive(Debug, Clone, Copy)]
+pub struct Key {
+    index: usize,
+    version: u32,
+}
+
 #[derive(Debug)]
 struct Surotto<T> {
     val: MaybeUninit<T>,
@@ -68,7 +74,7 @@ impl<T> SurottoMap<T> {
         self.inner.capacity()
     }
 
-    pub fn insert(&mut self, val: T) -> usize {
+    pub fn insert(&mut self, val: T) -> Key {
         if self.next_free == 0 {
             let pos = self.inner.len();
             self.inner.push(Surotto {
@@ -77,7 +83,10 @@ impl<T> SurottoMap<T> {
                 next_free: 0,
             });
             self.len += 1;
-            pos
+            Key {
+                index: pos,
+                version: 0,
+            }
         } else {
             let pos = self.next_free - 1;
             let surotto = &mut self.inner[pos];
@@ -86,13 +95,18 @@ impl<T> SurottoMap<T> {
             surotto.version |= SUROTTO_OCCUPIED;
             self.next_free = surotto.next_free;
             self.len += 1;
-            pos
+            Key {
+                index: pos,
+                version: surotto.version & !SUROTTO_OCCUPIED,
+            }
         }
     }
 
-    pub fn get(&self, key: usize) -> Option<&T> {
-        if let Some(surotto) = self.inner.get(key) {
-            if surotto.version & SUROTTO_OCCUPIED != 0 {
+    pub fn get(&self, key: Key) -> Option<&T> {
+        if let Some(surotto) = self.inner.get(key.index) {
+            if surotto.version & !SUROTTO_OCCUPIED == key.version
+                && surotto.version & SUROTTO_OCCUPIED != 0
+            {
                 // SAFETY: the slot is occupied, data is held
                 unsafe { Some(surotto.val.assume_init_ref()) }
             } else {
@@ -103,9 +117,11 @@ impl<T> SurottoMap<T> {
         }
     }
 
-    pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
-        if let Some(surotto) = self.inner.get_mut(key) {
-            if surotto.version & SUROTTO_OCCUPIED != 0 {
+    pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
+        if let Some(surotto) = self.inner.get_mut(key.index) {
+            if surotto.version & !SUROTTO_OCCUPIED == key.version
+                && surotto.version & SUROTTO_OCCUPIED != 0
+            {
                 // SAFETY: the slot is occupied, data is held
                 unsafe { Some(surotto.val.assume_init_mut()) }
             } else {
@@ -116,15 +132,17 @@ impl<T> SurottoMap<T> {
         }
     }
 
-    pub fn remove(&mut self, key: usize) -> Option<T> {
-        if let Some(surotto) = self.inner.get_mut(key) {
-            if surotto.version & SUROTTO_OCCUPIED != 0 {
+    pub fn remove(&mut self, key: Key) -> Option<T> {
+        if let Some(surotto) = self.inner.get_mut(key.index) {
+            if surotto.version & !SUROTTO_OCCUPIED == key.version
+                && surotto.version & SUROTTO_OCCUPIED != 0
+            {
                 // SAFETY: the slot is occupied, data is held
                 // SAFETY: we will mark it as free or overwrite later, no double free
                 let val = unsafe { surotto.val.assume_init_read() };
                 surotto.version = surotto.version + 1 & !SUROTTO_OCCUPIED;
                 surotto.next_free = self.next_free;
-                self.next_free = key + 1;
+                self.next_free = key.index + 1;
                 self.len -= 1;
                 Some(val)
             } else {
@@ -186,7 +204,13 @@ mod tests {
     fn test_get_out_of_bounds() {
         let map: SurottoMap<String> = SurottoMap::new();
 
-        assert_eq!(map.get(0), None);
+        assert_eq!(
+            map.get(Key {
+                index: 50,
+                version: 0
+            }),
+            None
+        );
     }
 
     #[test]
@@ -197,7 +221,13 @@ mod tests {
         let pos2 = map.insert(String::from("World"));
         let _pos3 = map.insert(String::from("Surotto"));
 
-        assert_eq!(map.remove(50), None);
+        assert_eq!(
+            map.remove(Key {
+                index: 50,
+                version: 0
+            }),
+            None
+        );
 
         assert_eq!(map.remove(pos2), Some(String::from("World")));
         assert_eq!(map.get(pos2), None);
@@ -207,9 +237,30 @@ mod tests {
 
         let repos2 = map.insert(String::from("Second World"));
 
-        assert_eq!(pos2, repos2);
+        assert_eq!(pos2.index, repos2.index);
+        assert_ne!(pos2.version, repos2.version);
         assert_eq!(map.get(repos2), Some(&String::from("Second World")));
         assert_eq!(map.len(), 3);
         assert_eq!(map.big_len(), 3);
+    }
+
+    #[test]
+    fn test_old_versioned_key() {
+        let mut map: SurottoMap<String> = SurottoMap::new();
+
+        let _pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+        let _pos3 = map.insert(String::from("Surotto"));
+
+        assert_eq!(map.get(pos2), Some(&String::from("World")));
+        assert_eq!(map.remove(pos2), Some(String::from("World")));
+        assert_eq!(map.get(pos2), None);
+
+        let repos2 = map.insert(String::from("World"));
+        assert_eq!(pos2.index, repos2.index);
+        assert_ne!(pos2.version, repos2.version);
+
+        assert_eq!(map.get(pos2), None);
+        assert_eq!(map.get(repos2), Some(&String::from("World")));
     }
 }
