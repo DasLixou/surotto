@@ -1,11 +1,12 @@
 use std::mem::MaybeUninit;
 
-const SUROTTO_FREE: u32 = 0b00000000;
-const SUROTTO_OCCUPIED: u32 = 0b10000000;
+const SUROTTO_FREE: u32 = 0b0;
+const SUROTTO_OCCUPIED: u32 = 0b1 << 31;
 
+#[derive(Debug)]
 struct Surotto<T> {
     val: MaybeUninit<T>,
-    version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 7 bits verison, increments on free | 0bSVVVVVVV
+    version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 31 bits verison, increments on free | 0bSVV....VVV
     next_free: usize, // 0 -> push | i -> occupied at i - 1
 }
 
@@ -58,6 +59,14 @@ impl<T> SurottoMap<T> {
     pub fn len(&self) -> usize {
         self.len
     }
+    #[inline]
+    pub fn big_len(&self) -> usize {
+        self.inner.len()
+    }
+    #[inline]
+    pub fn capacity(&self) -> usize {
+        self.inner.capacity()
+    }
 
     pub fn insert(&mut self, val: T) -> usize {
         if self.next_free == 0 {
@@ -70,7 +79,7 @@ impl<T> SurottoMap<T> {
             self.len += 1;
             pos
         } else {
-            let pos = self.next_free;
+            let pos = self.next_free - 1;
             let surotto = &mut self.inner[pos];
             debug_assert!(surotto.version & SUROTTO_OCCUPIED == 0);
             surotto.val.write(val);
@@ -105,5 +114,59 @@ impl<T> SurottoMap<T> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_insert() {
+        let mut map: SurottoMap<String> = SurottoMap::new();
+
+        let pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.big_len(), 2);
+        assert_eq!(map.get(pos1), Some(&String::from("Hello")));
+        assert_eq!(map.get(pos2), Some(&String::from("World")));
+    }
+
+    #[test]
+    fn test_do_insert() {
+        let mut map: SurottoMap<String> = SurottoMap::with_capacity(2);
+
+        let pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.big_len(), 2);
+        assert_eq!(map.get(pos1), Some(&String::from("Hello")));
+        assert_eq!(map.get(pos2), Some(&String::from("World")));
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut map: SurottoMap<String> = SurottoMap::new();
+
+        let pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+
+        if let Some(val) = map.get_mut(pos1) {
+            *val = String::from("Goodbye");
+        }
+
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get(pos1), Some(&String::from("Goodbye")));
+        assert_eq!(map.get(pos2), Some(&String::from("World")));
+    }
+
+    #[test]
+    fn test_get_out_of_bounds() {
+        let map: SurottoMap<String> = SurottoMap::new();
+
+        assert_eq!(map.get(0), None);
     }
 }
