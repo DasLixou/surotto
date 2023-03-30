@@ -5,7 +5,7 @@ const SUROTTO_OCCUPIED: u32 = 0b10000000;
 
 struct Surotto<T> {
     val: MaybeUninit<T>,
-    version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 7 bits verison | 0bSVVVVVVV
+    version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 7 bits verison, increments on free | 0bSVVVVVVV
     next_free: usize, // 0 -> push | i -> occupied at i - 1
 }
 
@@ -21,6 +21,7 @@ impl<T> Drop for Surotto<T> {
 pub struct SurottoMap<T> {
     inner: Vec<Surotto<T>>,
     next_free: usize, // 0 -> push | i -> occupied at i - 1
+    len: usize,
 }
 
 impl<T> SurottoMap<T> {
@@ -28,6 +29,7 @@ impl<T> SurottoMap<T> {
         Self {
             inner: Vec::new(),
             next_free: 0,
+            len: 0,
         }
     }
 
@@ -48,7 +50,13 @@ impl<T> SurottoMap<T> {
         Self {
             inner,
             next_free: 1,
+            len: 0,
         }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     pub fn insert(&mut self, val: T) -> usize {
@@ -59,9 +67,17 @@ impl<T> SurottoMap<T> {
                 version: 0 | SUROTTO_OCCUPIED,
                 next_free: 0,
             });
+            self.len += 1;
             pos
         } else {
-            todo!()
+            let pos = self.next_free;
+            let surotto = &mut self.inner[pos];
+            debug_assert!(surotto.version & SUROTTO_OCCUPIED == 0);
+            surotto.val.write(val);
+            surotto.version |= SUROTTO_OCCUPIED;
+            self.next_free = surotto.next_free;
+            self.len += 1;
+            pos
         }
     }
 }
