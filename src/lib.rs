@@ -1,19 +1,23 @@
+pub mod into_iter;
+
 use std::mem::MaybeUninit;
+
+use into_iter::IntoIter;
 
 const SUROTTO_FREE: u32 = 0b0;
 const SUROTTO_OCCUPIED: u32 = 0b1 << 31;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Key {
-    index: usize,
-    version: u32,
+    pub(crate) index: usize,
+    pub(crate) version: u32,
 }
 
 #[derive(Debug)]
-struct Surotto<T> {
-    val: MaybeUninit<T>,
-    version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 31 bits verison, increments on free | 0bSVV....VVV
-    next_free: usize, // 0 -> push | i -> occupied at i - 1
+pub(crate) struct Surotto<T> {
+    pub(crate) val: MaybeUninit<T>,
+    pub(crate) version: u32, // (S) 1 bit occupied(1) / free(0) | (V) 31 bits verison, increments on free | 0bSVV....VVV
+    pub(crate) next_free: usize, // 0 -> push | i -> occupied at i - 1
 }
 
 impl<T> Drop for Surotto<T> {
@@ -89,7 +93,7 @@ impl<T> SurottoMap<T> {
             self.len += 1;
             Key {
                 index: pos,
-                version: 0,
+                version: SUROTTO_OCCUPIED,
             }
         } else {
             let pos = self.next_free - 1;
@@ -101,14 +105,14 @@ impl<T> SurottoMap<T> {
             self.len += 1;
             Key {
                 index: pos,
-                version: surotto.version & !SUROTTO_OCCUPIED,
+                version: surotto.version,
             }
         }
     }
 
     pub fn get(&self, key: Key) -> Option<&T> {
         if let Some(surotto) = self.inner.get(key.index) {
-            if surotto.version & !SUROTTO_OCCUPIED == key.version
+            if surotto.version | SUROTTO_OCCUPIED == key.version
                 && surotto.version & SUROTTO_OCCUPIED != 0
             {
                 // SAFETY: the slot is occupied, data is held
@@ -123,7 +127,7 @@ impl<T> SurottoMap<T> {
 
     pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
         if let Some(surotto) = self.inner.get_mut(key.index) {
-            if surotto.version & !SUROTTO_OCCUPIED == key.version
+            if surotto.version | SUROTTO_OCCUPIED == key.version
                 && surotto.version & SUROTTO_OCCUPIED != 0
             {
                 // SAFETY: the slot is occupied, data is held
@@ -138,7 +142,7 @@ impl<T> SurottoMap<T> {
 
     pub fn remove(&mut self, key: Key) -> Option<T> {
         if let Some(surotto) = self.inner.get_mut(key.index) {
-            if surotto.version & !SUROTTO_OCCUPIED == key.version
+            if surotto.version | SUROTTO_OCCUPIED == key.version
                 && surotto.version & SUROTTO_OCCUPIED != 0
             {
                 // SAFETY: the slot is occupied, data is held
@@ -154,6 +158,17 @@ impl<T> SurottoMap<T> {
             }
         } else {
             None
+        }
+    }
+}
+
+impl<T> IntoIterator for SurottoMap<T> {
+    type Item = (Key, T);
+    type IntoIter = IntoIter<T>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            inner: self.inner.into_iter().enumerate(),
         }
     }
 }
@@ -266,5 +281,23 @@ mod tests {
 
         assert_eq!(map.get(pos2), None);
         assert_eq!(map.get(repos2), Some(&String::from("World")));
+    }
+
+    #[test]
+    fn test_into_iter() {
+        let mut map: SurottoMap<String> = SurottoMap::new();
+
+        let pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+        let pos3 = map.insert(String::from("Surotto"));
+
+        assert_eq!(
+            map.into_iter().collect::<Vec<_>>().as_slice(),
+            &[
+                (pos1, String::from("Hello")),
+                (pos2, String::from("World")),
+                (pos3, String::from("Surotto"))
+            ]
+        );
     }
 }
