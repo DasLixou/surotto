@@ -45,13 +45,13 @@ impl<T> SurottoMap<T> {
         for i in 0..capacity - 1 {
             inner.push(Surotto {
                 val: MaybeUninit::uninit(),
-                version: 0 | SUROTTO_FREE,
+                version: SUROTTO_FREE,
                 next_free: i + 2,
             });
         }
         inner.push(Surotto {
             val: MaybeUninit::uninit(),
-            version: 0 | SUROTTO_FREE,
+            version: SUROTTO_FREE,
             next_free: 0,
         });
         Self {
@@ -61,6 +61,10 @@ impl<T> SurottoMap<T> {
         }
     }
 
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
     #[inline]
     pub fn len(&self) -> usize {
         self.len
@@ -79,7 +83,7 @@ impl<T> SurottoMap<T> {
             let pos = self.inner.len();
             self.inner.push(Surotto {
                 val: MaybeUninit::new(val),
-                version: 0 | SUROTTO_OCCUPIED,
+                version: SUROTTO_OCCUPIED,
                 next_free: 0,
             });
             self.len += 1;
@@ -140,7 +144,7 @@ impl<T> SurottoMap<T> {
                 // SAFETY: the slot is occupied, data is held
                 // SAFETY: we will mark it as free or overwrite later, no double free
                 let val = unsafe { surotto.val.assume_init_read() };
-                surotto.version = surotto.version + 1 & !SUROTTO_OCCUPIED;
+                surotto.version = (surotto.version + 1) & !SUROTTO_OCCUPIED;
                 surotto.next_free = self.next_free;
                 self.next_free = key.index + 1;
                 self.len -= 1;
