@@ -80,4 +80,30 @@ impl<T> SurottoMap<T> {
             pos
         }
     }
+
+    pub fn get(&self, key: usize) -> Option<&T> {
+        if let Some(surotto) = self.inner.get(key) {
+            if surotto.version & SUROTTO_OCCUPIED != 0 {
+                // SAFETY: the slot is occupied, data is held
+                unsafe { Some(surotto.val.assume_init_ref()) }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, key: usize) -> Option<&mut T> {
+        if let Some(surotto) = self.inner.get_mut(key) {
+            if surotto.version & SUROTTO_OCCUPIED != 0 {
+                // SAFETY: the slot is occupied, data is held
+                unsafe { Some(surotto.val.assume_init_mut()) }
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
