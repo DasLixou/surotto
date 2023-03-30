@@ -115,6 +115,25 @@ impl<T> SurottoMap<T> {
             None
         }
     }
+
+    pub fn remove(&mut self, key: usize) -> Option<T> {
+        if let Some(surotto) = self.inner.get_mut(key) {
+            if surotto.version & SUROTTO_OCCUPIED != 0 {
+                // SAFETY: the slot is occupied, data is held
+                // SAFETY: we will mark it as free or overwrite later, no double free
+                let val = unsafe { surotto.val.assume_init_read() };
+                surotto.version = surotto.version + 1 & !SUROTTO_OCCUPIED;
+                surotto.next_free = self.next_free;
+                self.next_free = key + 1;
+                self.len -= 1;
+                Some(val)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -168,5 +187,29 @@ mod tests {
         let map: SurottoMap<String> = SurottoMap::new();
 
         assert_eq!(map.get(0), None);
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut map: SurottoMap<String> = SurottoMap::new();
+
+        let _pos1 = map.insert(String::from("Hello"));
+        let pos2 = map.insert(String::from("World"));
+        let _pos3 = map.insert(String::from("Surotto"));
+
+        assert_eq!(map.remove(50), None);
+
+        assert_eq!(map.remove(pos2), Some(String::from("World")));
+        assert_eq!(map.get(pos2), None);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.big_len(), 3);
+        assert_eq!(map.remove(pos2), None);
+
+        let repos2 = map.insert(String::from("Second World"));
+
+        assert_eq!(pos2, repos2);
+        assert_eq!(map.get(repos2), Some(&String::from("Second World")));
+        assert_eq!(map.len(), 3);
+        assert_eq!(map.big_len(), 3);
     }
 }
