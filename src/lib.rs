@@ -160,20 +160,28 @@ impl<T> SurottoMap<T> {
         }
     }
 
-    pub fn get_disjoint<const N: usize>(&self, keys: [Key; N]) -> Option<[&T; N]> {
+    pub fn get_disjoint<const N: usize>(&mut self, keys: [Key; N]) -> Option<[&T; N]> {
         // SAFETY: When return Some with this array, everything will be valid - code from unstable MaybeUninit::uninit_array()
         let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&T>; N]>::uninit().assume_init() };
-        for (i, key) in keys.into_iter().enumerate() {
-            if !self.contains_key(key) {
-                return None;
+        let mut undo_idx = N;
+        for (i, key) in keys.iter().enumerate() {
+            if !self.contains_key(*key) {
+                undo_idx = i;
+                break;
             }
-            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
-            let val = unsafe { &self.inner.get_unchecked(i).val };
+
+            let surotto = unsafe { self.inner.get_unchecked_mut(i) };
+            surotto.version &= !SUROTTO_OCCUPIED;
             // SAFETY: the slot is occupied, data is held
-            unsafe { refs[i].write(val.assume_init_ref()) };
+            unsafe { refs[i].write(&*surotto.val.as_ptr()) };
+        }
+        for k in &keys[..undo_idx] {
+            unsafe {
+                self.inner.get_unchecked_mut(k.index).version |= SUROTTO_OCCUPIED;
+            }
         }
         // modified code from unstable MaybeUninit::array_assume_init(refs)
-        {
+        if undo_idx == N {
             // SAFETY:
             // * The caller guarantees that all elements of the array are initialized
             // * `MaybeUninit<T>` and T are guaranteed to have the same layout
@@ -187,23 +195,34 @@ impl<T> SurottoMap<T> {
             // FIXME: required to avoid `~const Destruct` bound
             mem::forget(refs);
             Some(ret)
+        } else {
+            None
         }
     }
 
     pub fn get_disjoint_mut<const N: usize>(&mut self, keys: [Key; N]) -> Option<[&mut T; N]> {
         // SAFETY: When return Some with this array, everything will be valid - code from unstable MaybeUninit::uninit_array()
         let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&mut T>; N]>::uninit().assume_init() };
-        for (i, key) in keys.into_iter().enumerate() {
-            if !self.contains_key(key) {
-                return None;
+        let mut undo_idx = N;
+        for (i, key) in keys.iter().enumerate() {
+            if !self.contains_key(*key) {
+                undo_idx = i;
+                break;
             }
+
             // SAFETY: we checked if it is a valid key: contained and occupied with correct version
-            let val = unsafe { &mut self.inner.get_unchecked_mut(i).val };
+            let surotto = unsafe { self.inner.get_unchecked_mut(i) };
+            surotto.version &= !SUROTTO_OCCUPIED;
             // SAFETY: the slot is occupied, data is held
-            unsafe { refs[i].write(&mut *val.as_mut_ptr()) };
+            unsafe { refs[i].write(&mut *surotto.val.as_mut_ptr()) };
+        }
+        for k in &keys[..undo_idx] {
+            unsafe {
+                self.inner.get_unchecked_mut(k.index).version |= SUROTTO_OCCUPIED;
+            }
         }
         // modified code from unstable MaybeUninit::array_assume_init(refs)
-        {
+        if undo_idx == N {
             // SAFETY:
             // * The caller guarantees that all elements of the array are initialized
             // * `MaybeUninit<T>` and T are guaranteed to have the same layout
@@ -217,6 +236,8 @@ impl<T> SurottoMap<T> {
             // FIXME: required to avoid `~const Destruct` bound
             mem::forget(refs);
             Some(ret)
+        } else {
+            None
         }
     }
 
