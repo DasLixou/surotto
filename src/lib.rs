@@ -5,7 +5,10 @@ pub mod keys;
 pub mod values;
 pub mod values_mut;
 
-use std::mem::{self, MaybeUninit};
+use std::{
+    mem::{self, MaybeUninit},
+    ops::{Index, IndexMut},
+};
 
 use into_iter::IntoIter;
 use iter::Iter;
@@ -140,6 +143,12 @@ impl<T> SurottoMap<T> {
         }
     }
 
+    pub unsafe fn get_unchecked(&self, key: Key) -> &T {
+        // SAFETY: user promised
+        let surotto = unsafe { self.inner.get_unchecked(key.index) };
+        unsafe { surotto.val.assume_init_ref() }
+    }
+
     pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
         if self.validate_key(key) {
             // SAFETY: we checked if it is a valid key: contained and occupied with correct version
@@ -148,6 +157,12 @@ impl<T> SurottoMap<T> {
         } else {
             None
         }
+    }
+
+    pub unsafe fn get_unchecked_mut(&mut self, key: Key) -> &mut T {
+        // SAFETY: user promised
+        let surotto = unsafe { self.inner.get_unchecked_mut(key.index) };
+        unsafe { surotto.val.assume_init_mut() }
     }
 
     pub fn get_disjoint<const N: usize>(&mut self, keys: [Key; N]) -> Option<[&T; N]> {
@@ -277,6 +292,22 @@ impl<T> SurottoMap<T> {
         ValuesMut {
             inner: self.inner.iter_mut(),
         }
+    }
+}
+
+impl<T> Index<Key> for SurottoMap<T> {
+    type Output = T;
+
+    #[inline]
+    fn index(&self, key: Key) -> &Self::Output {
+        self.get(key).unwrap()
+    }
+}
+
+impl<T> IndexMut<Key> for SurottoMap<T> {
+    #[inline]
+    fn index_mut(&mut self, key: Key) -> &mut Self::Output {
+        self.get_mut(key).unwrap()
     }
 }
 
