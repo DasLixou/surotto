@@ -93,7 +93,7 @@ impl<T> SurottoMap<T> {
     }
 
     /// Returns `true` if the key is linked to an occupied slot with a correct version
-    pub fn contains_key(&self, key: Key) -> bool {
+    pub fn validate_key(&self, key: Key) -> bool {
         if let Some(surotto) = self.inner.get(key.index) {
             surotto.version | SUROTTO_OCCUPIED == key.version
                 && surotto.version & SUROTTO_OCCUPIED != 0
@@ -131,30 +131,20 @@ impl<T> SurottoMap<T> {
     }
 
     pub fn get(&self, key: Key) -> Option<&T> {
-        if let Some(surotto) = self.inner.get(key.index) {
-            if surotto.version | SUROTTO_OCCUPIED == key.version
-                && surotto.version & SUROTTO_OCCUPIED != 0
-            {
-                // SAFETY: the slot is occupied, data is held
-                unsafe { Some(surotto.val.assume_init_ref()) }
-            } else {
-                None
-            }
+        if self.validate_key(key) {
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
+            let surotto = unsafe { self.inner.get_unchecked(key.index) };
+            unsafe { Some(surotto.val.assume_init_ref()) }
         } else {
             None
         }
     }
 
     pub fn get_mut(&mut self, key: Key) -> Option<&mut T> {
-        if let Some(surotto) = self.inner.get_mut(key.index) {
-            if surotto.version | SUROTTO_OCCUPIED == key.version
-                && surotto.version & SUROTTO_OCCUPIED != 0
-            {
-                // SAFETY: the slot is occupied, data is held
-                unsafe { Some(surotto.val.assume_init_mut()) }
-            } else {
-                None
-            }
+        if self.validate_key(key) {
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
+            let surotto = unsafe { self.inner.get_unchecked_mut(key.index) };
+            unsafe { Some(surotto.val.assume_init_mut()) }
         } else {
             None
         }
@@ -165,11 +155,12 @@ impl<T> SurottoMap<T> {
         let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&T>; N]>::uninit().assume_init() };
         let mut undo_idx = N;
         for (i, key) in keys.iter().enumerate() {
-            if !self.contains_key(*key) {
+            if !self.validate_key(*key) {
                 undo_idx = i;
                 break;
             }
 
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
             let surotto = unsafe { self.inner.get_unchecked_mut(i) };
             surotto.version &= !SUROTTO_OCCUPIED;
             // SAFETY: the slot is occupied, data is held
@@ -205,7 +196,7 @@ impl<T> SurottoMap<T> {
         let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&mut T>; N]>::uninit().assume_init() };
         let mut undo_idx = N;
         for (i, key) in keys.iter().enumerate() {
-            if !self.contains_key(*key) {
+            if !self.validate_key(*key) {
                 undo_idx = i;
                 break;
             }
@@ -242,21 +233,16 @@ impl<T> SurottoMap<T> {
     }
 
     pub fn remove(&mut self, key: Key) -> Option<T> {
-        if let Some(surotto) = self.inner.get_mut(key.index) {
-            if surotto.version | SUROTTO_OCCUPIED == key.version
-                && surotto.version & SUROTTO_OCCUPIED != 0
-            {
-                // SAFETY: the slot is occupied, data is held
-                // SAFETY: we will mark it as free or overwrite later, no double free
-                let val = unsafe { surotto.val.assume_init_read() };
-                surotto.version = (surotto.version + 1) & !SUROTTO_OCCUPIED;
-                surotto.next_free = self.next_free;
-                self.next_free = key.index + 1;
-                self.len -= 1;
-                Some(val)
-            } else {
-                None
-            }
+        if self.validate_key(key) {
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
+            let surotto = unsafe { self.inner.get_unchecked_mut(key.index) };
+            // SAFETY: we will mark it as free or overwrite later, no double free
+            let val = unsafe { surotto.val.assume_init_read() };
+            surotto.version = (surotto.version + 1) & !SUROTTO_OCCUPIED;
+            surotto.next_free = self.next_free;
+            self.next_free = key.index + 1;
+            self.len -= 1;
+            Some(val)
         } else {
             None
         }
