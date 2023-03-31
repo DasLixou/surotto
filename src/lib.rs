@@ -5,7 +5,7 @@ pub mod keys;
 pub mod values;
 pub mod values_mut;
 
-use std::mem::MaybeUninit;
+use std::mem::{self, MaybeUninit};
 
 use into_iter::IntoIter;
 use iter::Iter;
@@ -92,6 +92,16 @@ impl<T> SurottoMap<T> {
         self.inner.capacity()
     }
 
+    /// Returns `true` if the key is linked to an occupied slot with a correct version
+    pub fn contains_key(&self, key: Key) -> bool {
+        if let Some(surotto) = self.inner.get(key.index) {
+            surotto.version | SUROTTO_OCCUPIED == key.version
+                && surotto.version & SUROTTO_OCCUPIED != 0
+        } else {
+            false
+        }
+    }
+
     pub fn insert(&mut self, val: T) -> Key {
         if self.next_free == 0 {
             let pos = self.inner.len();
@@ -147,6 +157,66 @@ impl<T> SurottoMap<T> {
             }
         } else {
             None
+        }
+    }
+
+    pub fn get_disjoint<const N: usize>(&self, keys: [Key; N]) -> Option<[&T; N]> {
+        // SAFETY: When return Some with this array, everything will be valid - code from unstable MaybeUninit::uninit_array()
+        let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&T>; N]>::uninit().assume_init() };
+        for (i, key) in keys.into_iter().enumerate() {
+            if !self.contains_key(key) {
+                return None;
+            }
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
+            let val = unsafe { &self.inner.get_unchecked(i).val };
+            // SAFETY: the slot is occupied, data is held
+            unsafe { refs[i].write(val.assume_init_ref()) };
+        }
+        // modified code from unstable MaybeUninit::array_assume_init(refs)
+        {
+            // SAFETY:
+            // * The caller guarantees that all elements of the array are initialized
+            // * `MaybeUninit<T>` and T are guaranteed to have the same layout
+            // * `MaybeUninit` does not drop, so there are no double-frees
+            // And thus the conversion is safe
+            let ret = unsafe {
+                //intrinsics::assert_inhabited::<[&T; N]>();
+                (&refs as *const _ as *const [&T; N]).read()
+            };
+
+            // FIXME: required to avoid `~const Destruct` bound
+            mem::forget(refs);
+            Some(ret)
+        }
+    }
+
+    pub fn get_disjoint_mut<const N: usize>(&mut self, keys: [Key; N]) -> Option<[&mut T; N]> {
+        // SAFETY: When return Some with this array, everything will be valid - code from unstable MaybeUninit::uninit_array()
+        let mut refs = unsafe { MaybeUninit::<[MaybeUninit<&mut T>; N]>::uninit().assume_init() };
+        for (i, key) in keys.into_iter().enumerate() {
+            if !self.contains_key(key) {
+                return None;
+            }
+            // SAFETY: we checked if it is a valid key: contained and occupied with correct version
+            let val = unsafe { &mut self.inner.get_unchecked_mut(i).val };
+            // SAFETY: the slot is occupied, data is held
+            unsafe { refs[i].write(&mut *val.as_mut_ptr()) };
+        }
+        // modified code from unstable MaybeUninit::array_assume_init(refs)
+        {
+            // SAFETY:
+            // * The caller guarantees that all elements of the array are initialized
+            // * `MaybeUninit<T>` and T are guaranteed to have the same layout
+            // * `MaybeUninit` does not drop, so there are no double-frees
+            // And thus the conversion is safe
+            let ret = unsafe {
+                //intrinsics::assert_inhabited::<[&mut T; N]>();
+                (&refs as *const _ as *const [&mut T; N]).read()
+            };
+
+            // FIXME: required to avoid `~const Destruct` bound
+            mem::forget(refs);
+            Some(ret)
         }
     }
 
