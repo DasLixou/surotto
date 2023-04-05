@@ -1,3 +1,7 @@
+#![no_std]
+
+extern crate alloc;
+
 pub mod into_iter;
 pub mod iter;
 pub mod iter_mut;
@@ -5,11 +9,12 @@ pub mod keys;
 pub mod values;
 pub mod values_mut;
 
-use std::{
+use core::{
     mem::{self, MaybeUninit},
     ops::{Index, IndexMut},
 };
 
+use alloc::vec::Vec;
 use into_iter::IntoIter;
 use iter::Iter;
 use iter_mut::IterMut;
@@ -325,6 +330,8 @@ impl<T> IntoIterator for SurottoMap<T> {
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::String;
+
     use super::*;
 
     #[test]

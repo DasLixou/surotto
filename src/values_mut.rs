@@ -1,7 +1,7 @@
 use crate::{Surotto, SUROTTO_OCCUPIED};
 
 pub struct ValuesMut<'s, T> {
-    pub(crate) inner: std::slice::IterMut<'s, Surotto<T>>,
+    pub(crate) inner: core::slice::IterMut<'s, Surotto<T>>,
 }
 
 impl<'s, T> Iterator for ValuesMut<'s, T> {

@@ -1,7 +1,7 @@
 use crate::{Surotto, SUROTTO_OCCUPIED};
 
 pub struct Values<'s, T> {
-    pub(crate) inner: std::slice::Iter<'s, Surotto<T>>,
+    pub(crate) inner: core::slice::Iter<'s, Surotto<T>>,
 }
 
 impl<'s, T> Iterator for Values<'s, T> {

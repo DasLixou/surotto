@@ -1,7 +1,9 @@
+use core::iter;
+
 use crate::{Key, Surotto, SUROTTO_OCCUPIED};
 
 pub struct IterMut<'s, T> {
-    pub(crate) inner: std::iter::Enumerate<std::slice::IterMut<'s, Surotto<T>>>,
+    pub(crate) inner: iter::Enumerate<core::slice::IterMut<'s, Surotto<T>>>,
 }
 
 impl<'s, T> Iterator for IterMut<'s, T> {

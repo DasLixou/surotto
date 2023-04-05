@@ -1,9 +1,9 @@
-use std::mem;
+use core::{iter, mem};
 
 use crate::{Key, Surotto, SUROTTO_OCCUPIED};
 
 pub struct IntoIter<T> {
-    pub(crate) inner: std::iter::Enumerate<std::vec::IntoIter<Surotto<T>>>,
+    pub(crate) inner: iter::Enumerate<alloc::vec::IntoIter<Surotto<T>>>,
 }
 
 impl<T> Iterator for IntoIter<T> {

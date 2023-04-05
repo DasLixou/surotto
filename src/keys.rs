@@ -1,7 +1,9 @@
+use core::iter;
+
 use crate::{Key, Surotto, SUROTTO_OCCUPIED};
 
 pub struct Keys<'s, T> {
-    pub(crate) inner: std::iter::Enumerate<std::slice::Iter<'s, Surotto<T>>>,
+    pub(crate) inner: iter::Enumerate<core::slice::Iter<'s, Surotto<T>>>,
 }
 
 impl<'s, T> Iterator for Keys<'s, T> {
