@@ -10,6 +10,12 @@ pub struct SimpleAssocSurotto<K: SimpleKey, V> {
     phantom: PhantomData<K>,
 }
 
+impl<K: SimpleKey, V> Default for SimpleAssocSurotto<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K: SimpleKey, V> SimpleAssocSurotto<K, V> {
     /// Constructs a new, empty `SimpleAssocSurotto<K, V>`.
     ///
