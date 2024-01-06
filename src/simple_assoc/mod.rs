@@ -2,9 +2,13 @@ use std::{collections::TryReserveError, iter, marker::PhantomData};
 
 use crate::simple::SimpleKey;
 
-use self::entry::{Entry, OccupiedEntry, VacantEntry};
+use self::{
+    entry::{Entry, OccupiedEntry, VacantEntry},
+    iterators::{Iter, IterMut, Keys, Values, ValuesMut},
+};
 
 pub mod entry;
+pub mod iterators;
 
 /// A datastructure where values can be associated with a key from a [`SimpleSurotto`].
 ///
@@ -221,6 +225,45 @@ impl<K: SimpleKey, V> SimpleAssocSurotto<K, V> {
     /// If the current capacity is less than the lower limit, this is a no-op.
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.inner.shrink_to(min_capacity)
+    }
+
+    /// An iterator visiting all key-value pairs.
+    /// The iterator element type is `(K, &'a V)`.
+    pub fn iter(&self) -> Iter<'_, K, V> {
+        Iter {
+            inner: self.inner.iter().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// An iterator visiting all key-value pairs,
+    /// with mutable references to the values.
+    /// The iterator element type is `(K, &'a mut V)`.
+    pub fn iter_mut(&mut self) -> IterMut<'_, K, V> {
+        IterMut {
+            inner: self.inner.iter_mut().enumerate(),
+            phantom: PhantomData,
+        }
+    }
+
+    /// An iterator visiting all keys.
+    /// The iterator element type is `K`.
+    pub fn keys(&self) -> Keys<'_, K, V> {
+        Keys { inner: self.iter() }
+    }
+
+    /// An iterator visiting all values.
+    /// The iterator element type is `&'a V`.
+    pub fn values(&self) -> Values<'_, K, V> {
+        Values { inner: self.iter() }
+    }
+
+    /// An iterator visiting all values mutably.
+    /// The iterator element type is `&'a mut V`.
+    pub fn values_mut(&mut self) -> ValuesMut<'_, K, V> {
+        ValuesMut {
+            inner: self.iter_mut(),
+        }
     }
 }
 
