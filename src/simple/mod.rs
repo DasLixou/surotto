@@ -5,10 +5,10 @@ use std::{
 };
 
 pub mod iterators;
+use self::iterators::{Iter, IterMut, Keys, Values, ValuesMut};
 
 mod key;
-use self::iterators::{Iter, IterMut, Keys, Values, ValuesMut};
-pub use self::key::SimpleKey;
+pub use self::key::*;
 
 /// A datastructure where values can only be inserted, returning a typed key.
 ///
@@ -50,6 +50,10 @@ impl<K: SimpleKey, V> SimpleSurotto<K, V> {
     }
 
     /// Inserts a value into the surotto, returning its key.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the key index is `usize::MAX`.
     pub fn insert(&mut self, value: V) -> K {
         let key = unsafe {
             // SAFETY: Caller assures that we are the surotto allowed to create keys.
