@@ -10,12 +10,6 @@ pub struct SimpleAssocSurotto<K: SimpleKey, V> {
     phantom: PhantomData<K>,
 }
 
-impl<K: SimpleKey, V> Default for SimpleAssocSurotto<K, V> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<K: SimpleKey, V> SimpleAssocSurotto<K, V> {
     /// Constructs a new, empty `SimpleAssocSurotto<K, V>`.
     ///
@@ -223,6 +217,12 @@ impl<K: SimpleKey, V> SimpleAssocSurotto<K, V> {
     /// If the current capacity is less than the lower limit, this is a no-op.
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.inner.shrink_to(min_capacity)
+    }
+}
+
+impl<K: SimpleKey, V> Default for SimpleAssocSurotto<K, V> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

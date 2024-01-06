@@ -1,4 +1,8 @@
-use std::{collections::TryReserveError, marker::PhantomData};
+use std::{
+    collections::TryReserveError,
+    marker::PhantomData,
+    ops::{Index, IndexMut},
+};
 
 mod key;
 pub use self::key::SimpleKey;
@@ -13,12 +17,6 @@ pub use self::key::SimpleKey;
 pub struct SimpleSurotto<K: SimpleKey, V> {
     inner: Vec<V>,
     phantom: PhantomData<K>,
-}
-
-impl<K: SimpleKey, V> Default for SimpleSurotto<K, V> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<K: SimpleKey, V> SimpleSurotto<K, V> {
@@ -192,5 +190,25 @@ impl<K: SimpleKey, V> SimpleSurotto<K, V> {
     /// If the current capacity is less than the lower limit, this is a no-op.
     pub fn shrink_to(&mut self, min_capacity: usize) {
         self.inner.shrink_to(min_capacity)
+    }
+}
+
+impl<K: SimpleKey, V> Default for SimpleSurotto<K, V> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<K: SimpleKey, V> Index<K> for SimpleSurotto<K, V> {
+    type Output = V;
+
+    fn index(&self, key: K) -> &Self::Output {
+        self.get(key)
+    }
+}
+
+impl<K: SimpleKey, V> IndexMut<K> for SimpleSurotto<K, V> {
+    fn index_mut(&mut self, key: K) -> &mut Self::Output {
+        self.get_mut(key)
     }
 }
