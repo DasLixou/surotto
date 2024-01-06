@@ -4,7 +4,7 @@ use crate::simple::SimpleKey;
 
 use self::{
     entry::{Entry, OccupiedEntry, VacantEntry},
-    iterators::{Iter, IterMut, Keys, Values, ValuesMut},
+    iterators::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut},
 };
 
 pub mod entry;
@@ -270,5 +270,17 @@ impl<K: SimpleKey, V> SimpleAssocSurotto<K, V> {
 impl<K: SimpleKey, V> Default for SimpleAssocSurotto<K, V> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<K: SimpleKey, V> IntoIterator for SimpleAssocSurotto<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            inner: self.inner.into_iter().enumerate(),
+            phantom: PhantomData,
+        }
     }
 }

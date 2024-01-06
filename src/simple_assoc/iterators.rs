@@ -50,6 +50,30 @@ impl<'a, K: SimpleKey, V> Iterator for IterMut<'a, K, V> {
     }
 }
 
+pub struct IntoIter<K: SimpleKey, V> {
+    pub(super) inner: iter::Enumerate<std::vec::IntoIter<Option<V>>>,
+    pub(super) phantom: PhantomData<K>,
+}
+
+impl<K: SimpleKey, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.find_map(|(i, opt)| {
+            opt.map(|val| {
+                (
+                    unsafe {
+                        // SAFETY: The iterator only returns elements which are present and
+                        //          elements can't be removed from the `SimpleSurotto`, thus the creation of the key is safe here.
+                        K::new(i)
+                    },
+                    val,
+                )
+            })
+        })
+    }
+}
+
 pub struct Keys<'a, K: SimpleKey, V> {
     pub(super) inner: Iter<'a, K, V>,
 }

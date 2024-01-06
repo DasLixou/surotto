@@ -46,6 +46,28 @@ impl<'a, K: SimpleKey, V> Iterator for IterMut<'a, K, V> {
     }
 }
 
+pub struct IntoIter<K: SimpleKey, V> {
+    pub(super) inner: iter::Enumerate<std::vec::IntoIter<V>>,
+    pub(super) phantom: PhantomData<K>,
+}
+
+impl<K: SimpleKey, V> Iterator for IntoIter<K, V> {
+    type Item = (K, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().map(|(i, val)| {
+            (
+                unsafe {
+                    // SAFETY: The iterator only returns elements which are present and
+                    //          elements can't be removed, thus the creation of the key is safe here.
+                    K::new(i)
+                },
+                val,
+            )
+        })
+    }
+}
+
 pub struct Keys<'a, K: SimpleKey, V> {
     pub(super) inner: Iter<'a, K, V>,
 }

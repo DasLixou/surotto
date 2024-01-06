@@ -5,7 +5,7 @@ use std::{
 };
 
 pub mod iterators;
-use self::iterators::{Iter, IterMut, Keys, Values, ValuesMut};
+use self::iterators::{IntoIter, Iter, IterMut, Keys, Values, ValuesMut};
 
 mod key;
 pub use self::key::*;
@@ -256,5 +256,17 @@ impl<K: SimpleKey, V> Index<K> for SimpleSurotto<K, V> {
 impl<K: SimpleKey, V> IndexMut<K> for SimpleSurotto<K, V> {
     fn index_mut(&mut self, key: K) -> &mut Self::Output {
         self.get_mut(key)
+    }
+}
+
+impl<K: SimpleKey, V> IntoIterator for SimpleSurotto<K, V> {
+    type Item = (K, V);
+    type IntoIter = IntoIter<K, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        IntoIter {
+            inner: self.inner.into_iter().enumerate(),
+            phantom: PhantomData,
+        }
     }
 }
