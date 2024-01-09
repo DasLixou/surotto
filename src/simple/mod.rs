@@ -199,6 +199,30 @@ impl<K: SimpleKey, V> SimpleSurotto<K, V> {
         self.inner.shrink_to(min_capacity)
     }
 
+    /// Maps the surotto over a function, retaining its keys
+    pub fn map<F, T>(self, map: F) -> SimpleSurotto<K, T>
+    where
+        F: Fn(K, V) -> T,
+    {
+        SimpleSurotto {
+            inner: self
+                .inner
+                .into_iter()
+                .enumerate()
+                .map(|(k, v)| {
+                    map(
+                        unsafe {
+                            // SAFETY: the key is present in the map
+                            K::new(k)
+                        },
+                        v,
+                    )
+                })
+                .collect(),
+            phantom: PhantomData,
+        }
+    }
+
     /// An iterator visiting all key-value pairs.
     /// The iterator element type is `(K, &'a V)`.
     pub fn iter(&self) -> Iter<'_, K, V> {
